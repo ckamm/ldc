@@ -60,7 +60,11 @@ static void codegenModule(llvm::TargetMachine &Target, llvm::Module& m,
     // Build up all of the passes that we want to do to the module.
     FunctionPassManager Passes(&m);
 
-#if LDC_LLVM_VER >= 302
+#if LDC_LLVM_VER >= 305
+    if (const DataLayout *DL = Target.getDataLayout())
+        m.setDataLayout(DL);
+    Passes.add(new DataLayoutPass(&m));
+#elif LDC_LLVM_VER >= 302
     if (const DataLayout *DL = Target.getDataLayout())
         Passes.add(new DataLayout(*DL));
     else
@@ -117,6 +121,14 @@ static void assemble(const std::string &asmpath, const std::string &objpath)
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
+#if LDC_LLVM_VER >= 305
+static llvm::sys::fs::OpenFlags open_flag_binary = llvm::sys::fs::F_None;
+static llvm::sys::fs::OpenFlags open_flag_text = llvm::sys::fs::F_Text;
+#else
+static llvm::sys::fs::OpenFlags open_flag_binary = llvm::sys::fs::F_Binary;
+static llvm::sys::fs::OpenFlags open_flag_text = llvm::sys::fs::F_None;
+#endif
+
 void writeModule(llvm::Module* m, std::string filename)
 {
     // run optimizer
@@ -136,7 +148,7 @@ void writeModule(llvm::Module* m, std::string filename)
         llvm::sys::path::replace_extension(bcpath, global.bc_ext);
         Logger::println("Writing LLVM bitcode to: %s\n", bcpath.c_str());
         std::string errinfo;
-        llvm::raw_fd_ostream bos(bcpath.c_str(), errinfo, llvm::sys::fs::F_Binary);
+        llvm::raw_fd_ostream bos(bcpath.c_str(), errinfo, open_flag_binary);
         if (bos.has_error())
         {
             error("cannot write LLVM bitcode file '%s': %s", bcpath.c_str(), errinfo.c_str());
@@ -151,7 +163,7 @@ void writeModule(llvm::Module* m, std::string filename)
         llvm::sys::path::replace_extension(llpath, global.ll_ext);
         Logger::println("Writing LLVM asm to: %s\n", llpath.c_str());
         std::string errinfo;
-        llvm::raw_fd_ostream aos(llpath.c_str(), errinfo);
+        llvm::raw_fd_ostream aos(llpath.c_str(), errinfo, open_flag_text);
         if (aos.has_error())
         {
             error("cannot write LLVM asm file '%s': %s", llpath.c_str(), errinfo.c_str());
@@ -180,7 +192,7 @@ void writeModule(llvm::Module* m, std::string filename)
         Logger::println("Writing native asm to: %s\n", spath.c_str());
         std::string err;
         {
-            llvm::raw_fd_ostream out(spath.c_str(), err);
+            llvm::raw_fd_ostream out(spath.c_str(), err, open_flag_text);
             if (err.empty())
             {
                 codegenModule(*gTargetMachine, *m, out, llvm::TargetMachine::CGFT_AssemblyFile);
@@ -210,7 +222,7 @@ void writeModule(llvm::Module* m, std::string filename)
         Logger::println("Writing object file to: %s\n", objpath.c_str());
         std::string err;
         {
-            llvm::raw_fd_ostream out(objpath.c_str(), err, llvm::sys::fs::F_Binary);
+            llvm::raw_fd_ostream out(objpath.c_str(), err, open_flag_binary);
             if (err.empty())
             {
                 codegenModule(*gTargetMachine, *m, out, llvm::TargetMachine::CGFT_ObjectFile);

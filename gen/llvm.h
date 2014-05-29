@@ -31,7 +31,13 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/IRBuilder.h"
+#if LDC_LLVM_VER >= 305
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/CallSite.h"
+#else
 #include "llvm/DebugInfo.h"
+#include "llvm/Support/CallSite.h"
+#endif
 #else
 #include "llvm/Type.h"
 #include "llvm/DerivedTypes.h"
@@ -52,12 +58,12 @@
 #include "llvm/Analysis/DebugInfo.h"
 #include "llvm/Support/IRBuilder.h"
 #endif
+#include "llvm/Support/CallSite.h"
 #endif
 
 
 #include "gen/llvmcompat.h"
 
-#include "llvm/Support/CallSite.h"
 
 using llvm::IRBuilder;
 

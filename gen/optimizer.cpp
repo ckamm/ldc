@@ -28,13 +28,14 @@
 #include "llvm/ADT/Triple.h"
 #if LDC_LLVM_VER >= 305
 #include "llvm/IR/Verifier.h"
+#include "llvm/IR/LegacyPassNameParser.h"
 #else
 #include "llvm/Analysis/Verifier.h"
+#include "llvm/Support/PassNameParser.h"
 #endif
 #include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/PassNameParser.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -170,6 +171,13 @@ static void addGarbageCollect2StackPass(const PassManagerBuilder &builder, PassM
         addPass(pm, createGarbageCollect2Stack());
 }
 
+#if LDC_LLVM_VER >= 305
+static void addAddDiscriminatorsPass(const PassManagerBuilder &Builder,
+                                     PassManagerBase &PM) {
+  PM.add(createAddDiscriminatorsPass());
+}
+#endif
+
 #if LDC_LLVM_VER >= 303
 static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
                                       PassManagerBase &PM) {
@@ -234,6 +242,12 @@ static void addOptimizationPasses(PassManagerBase &mpm, FunctionPassManager &fpm
     builder.DisableUnrollLoops = optLevel == 0;
     /* builder.Vectorize is set in ctor from command line switch */
 
+#if LDC_LLVM_VER >= 305
+    // Fix up the DWARF path discriminator in debug info
+    builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                         addAddDiscriminatorsPass);
+#endif
+
 #if LDC_LLVM_VER >= 303
     if (opts::sanitize == opts::AddressSanitizer) {
         builder.addExtension(PassManagerBuilder::EP_OptimizerLast,
@@ -292,7 +306,9 @@ bool ldc_optimize_module(llvm::Module* m)
     mpm.add(tli);
 
     // Add an appropriate TargetData instance for this module.
-#if LDC_LLVM_VER >= 302
+#if LDC_LLVM_VER >= 305
+    mpm.add(new DataLayoutPass(m));
+#elif LDC_LLVM_VER >= 302
     mpm.add(new DataLayout(m));
 #else
     mpm.add(new TargetData(m));
@@ -300,7 +316,9 @@ bool ldc_optimize_module(llvm::Module* m)
 
     // Also set up a manager for the per-function passes.
     FunctionPassManager fpm(m);
-#if LDC_LLVM_VER >= 302
+#if LDC_LLVM_VER >= 305
+    fpm.add(new DataLayoutPass(m));
+#elif LDC_LLVM_VER >= 302
     fpm.add(new DataLayout(m));
 #else
     fpm.add(new TargetData(m));

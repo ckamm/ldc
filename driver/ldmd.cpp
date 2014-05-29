@@ -987,8 +987,13 @@ std::string locateBinary(std::string exeName, const char* argv0)
  * Makes sure the given directory (absolute or relative) exists on disk.
  */
 static void createOutputDir(const char* dir) {
+#if LDC_LLVM_VER >= 305
+    bool ignoreExisting = true;
+    if (ls::fs::create_directories(dir, ignoreExisting) != llvm::errc::success)
+#else
     bool dirExisted; // ignored
     if (ls::fs::create_directories(dir, dirExisted) != llvm::errc::success)
+#endif
         error("Could not create output directory '%s'.", dir);
 }
 

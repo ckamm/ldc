@@ -1029,7 +1029,12 @@ DValue* CallExp::toElem(IRState* p)
             LLValue* ptr = exp1->toElem(p)->getRVal();
             LLValue* cmp = exp2->toElem(p)->getRVal();
             LLValue* val = exp3->toElem(p)->getRVal();
+#if LDC_LLVM_VER >= 305
+            // allow the intrinsic to specify success and failure orderings?
+            LLValue* ret = gIR->ir->CreateAtomicCmpXchg(ptr, cmp, val, llvm::AtomicOrdering(atomicOrdering), llvm::AtomicOrdering(atomicOrdering));
+#else
             LLValue* ret = gIR->ir->CreateAtomicCmpXchg(ptr, cmp, val, llvm::AtomicOrdering(atomicOrdering));
+#endif
             return new DImValue(exp3->type, ret);
         // atomicrmw instruction
         } else if (fndecl->llvmInternal == LLVMatomic_rmw) {

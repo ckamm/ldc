@@ -311,7 +311,11 @@ llvm::DIType ldc::DIBuilder::CreateCompositeType(Type *type)
     // set diCompositeType to handle recursive types properly
     unsigned tag = (t->ty == Tstruct) ? llvm::dwarf::DW_TAG_structure_type
                                         : llvm::dwarf::DW_TAG_class_type;
+#if LDC_LLVM_VER >= 305
+    ir->diCompositeType = DBuilder.createReplaceableForwardDecl(tag, name,
+#else
     ir->diCompositeType = DBuilder.createForwardDecl(tag, name,
+#endif
 #if LDC_LLVM_VER >= 302
                                                            CU,
 #endif
@@ -372,7 +376,11 @@ llvm::DIType ldc::DIBuilder::CreateCompositeType(Type *type)
         );
     }
 
+#if LDC_LLVM_VER >= 305
+    ir->diCompositeType.replaceAllUsesWith(getContext(), ret);
+#else
     ir->diCompositeType.replaceAllUsesWith(ret);
+#endif
     ir->diCompositeType = ret;
 
     return ret;
@@ -662,6 +670,12 @@ void ldc::DIBuilder::EmitBlockStart(Loc loc)
             CreateFile(loc), // file
             loc.linnum, // line
             0 // column
+#if LDC_LLVM_VER >= 305
+            // DWARF path discriminator value
+            // It seems the AddDiscriminators pass sets these to useful values.
+            // clang also just passes 0 in the initial construction.
+            , 0
+#endif
             );
     IR->func()->diLexicalBlocks.push(block);
     EmitStopPoint(loc.linnum);
